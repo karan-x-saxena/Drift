@@ -6,13 +6,14 @@ import (
 	"log"
 	"log/slog"
 
+	"drift/config"
 	"drift/pkg"
 
 	"github.com/valyala/fasthttp"
 )
 
 func ProxyHandler(ctx *fasthttp.RequestCtx) {
-	targetURL := "http://127.0.0.1:8080" // Replace with your target backend URL
+	targetURL := "http://google.com"
 
 	// Create a request for the target
 	req := fasthttp.AcquireRequest()
@@ -43,6 +44,9 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 func main() {
 	port := flag.String("p", "8080", "Port to run the HTTP server")
 	logFileName := flag.String("l", "", "Directory for log files")
+	generateDefaultConfig := flag.String("g", "", "Generate Default COnfiguration for Drift")
+	configYaml := flag.String("y", "", "Yaml config for Drift")
+
 	flag.Parse()
 
 	var logger pkg.Logger
@@ -54,10 +58,24 @@ func main() {
 
 	logger.InitLogger()
 
+	if *generateDefaultConfig != "" {
+		err := config.BaseYamlFile()
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
+
 	slog.Info("drift starts here!")
-	// requestHandler := func(ctx *fasthttp.RequestCtx) {
-	// 	fmt.Fprintf(ctx, "Hello, world! Requested path is %q", ctx.Path())
-	// }
+
+	if *configYaml != "" {
+		_, err := config.NewYamlConfig(*configYaml)
+		if err != nil {
+			slog.Error(err.Error())
+			return
+		}
+	}
+
 	s := &fasthttp.Server{
 		Handler: ProxyHandler,
 
