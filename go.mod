@@ -2,7 +2,10 @@ module drift
 
 go 1.21.3
 
-require github.com/valyala/fasthttp v1.57.0
+require (
+	github.com/valyala/fasthttp v1.57.0
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
