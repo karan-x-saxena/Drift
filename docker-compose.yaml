@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  drift-dev:
+    stdin_open: true
+    tty: true
+    restart: always
+    image: golang:latest
+    container_name: go-dev
+    working_dir: /home
+    ports:
+      - 6969:80
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    volumes:
+      - .:/home/drift
+    networks:
+      drift-network:
+        ipv4_address: 172.18.0.222
+
+
+networks:
+  drift-network:
+    external:
+      name: drift-network
