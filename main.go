@@ -12,6 +12,40 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+func OProxyHandler(ctx *fasthttp.RequestCtx) {
+	const targetURL = "https://www.google.com" // Use HTTPS directly to avoid redirection overhead
+
+	// Acquire request and response objects from pools
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+
+	// Defer their release to avoid memory leaks
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	// Efficiently copy the incoming request to the target request
+	ctx.Request.CopyTo(req)
+
+	// Set the target URL while preserving the incoming URI path
+	req.SetRequestURIBytes(append([]byte(targetURL), ctx.URI().PathOriginal()...))
+
+	// Send the request to the target and check for errors
+	if err := fasthttp.Do(req, resp); err != nil {
+		log.Printf("Proxy error: %v", err)
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetBodyString("Internal Server Error")
+		return
+	}
+
+	resp.CopyTo(&ctx.Response)
+
+	// // Optimize response copying
+	// ctx.Response.SetStatusCode(resp.StatusCode())
+	// ctx.Response.Header.SetContentTypeBytes(resp.Header.Peek("Content-Type"))
+	// ctx.Response.Header.SetBytesV("Content-Length", resp.Header.Peek("Content-Length"))
+	// ctx.Response.SetBodyRaw(resp.Body())
+}
+
 func ProxyHandler(ctx *fasthttp.RequestCtx) {
 	targetURL := "http://google.com"
 
@@ -67,17 +101,26 @@ func main() {
 	}
 
 	slog.Info("drift starts here!")
+	var c config.Config
 
 	if *configYaml != "" {
-		_, err := config.NewYamlConfig(*configYaml)
+		var err error
+		c, err = config.NewYamlConfig(*configYaml)
 		if err != nil {
 			slog.Error(err.Error())
 			return
 		}
 	}
 
+	var handler *pkg.HttpClient
+
+	for _, server := range c.Servers {
+		handler = pkg.NewHttpClient(server.Url, server.MaxConnection, server.MaxConnectionTimeout, server.MaxConnectionDuration, server.MaxIdemponentCallAttempts, server.MaxIdleConnectionDuration)
+		go handler.HeathCheck(server.HealthCheckPath, c.HeathCheckTimer)
+
+	}
 	s := &fasthttp.Server{
-		Handler: ProxyHandler,
+		Handler: handler.ProxyHandler(),
 
 		// Every response will contain 'Server: My super server' header.
 		Name: "My super server",
